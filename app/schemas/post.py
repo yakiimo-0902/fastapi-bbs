@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import datetime
 
 # 共通部分（content, parent_post_id）
 class PostBase(BaseModel):
@@ -14,4 +15,4 @@ class PostResponse(PostBase):
     id: int
     thread_id: int
     post_number: int
-    created_at: str
+    created_at: datetime
