@@ -15,8 +15,44 @@ router = APIRouter(
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import aliased
 
 templates = Jinja2Templates(directory="app/templates")
+# -----------------------------------
+# フロント側処理 詳細
+# -----------------------------------
+@router.get("/{thread_id}/view", response_class=HTMLResponse)
+async def threads_detail_page(request: Request, thread_id: int, db: Session = Depends(get_db)):
+    ParentPost = aliased(Post)   # ← Post の別名（親投稿用）
+    # --- {thread_id}への投稿を取得（ThreadとJOIN） ---
+    stmt_posts = (
+        select(
+            Post.id,
+            Post.content,
+            Post.author,
+            Post.created_at,
+            Post.attachment,
+            Post.post_number,
+            Thread.title.label("thread_title"),
+            Thread.id.label("thread_id"),
+            # 追加：親投稿の post_number（無い場合は NULL）
+            ParentPost.post_number.label("parent_post_number")
+        )
+        .join(Thread, Thread.id == Post.thread_id)
+        .where(Thread.id==thread_id)
+        .join(ParentPost, ParentPost.id == Post.parent_post_id, isouter=True)
+        .order_by(Post.post_number.asc())
+    )
+
+    latest_posts = db.execute(stmt_posts).all()
+
+    return templates.TemplateResponse(
+        "thread_detail.html",
+        {"request": request,
+        "latest_posts": latest_posts,
+        "thread_id":thread_id}
+    )
+
 # -----------------------------------
 # フロント側処理 一覧
 # -----------------------------------
@@ -35,6 +71,7 @@ async def list_threads_page(request: Request, db: Session = Depends(get_db)):
             Post.author,
             Post.created_at,
             Post.attachment,
+            Post.post_number,
             Thread.title.label("thread_title"),
             Thread.id.label("thread_id")
         )
@@ -51,6 +88,8 @@ async def list_threads_page(request: Request, db: Session = Depends(get_db)):
         "threads": threads,
         "latest_posts": latest_posts}
     )
+
+
 
 # -----------------------------------
 # フロント側処理 スレッドの新規作成画面を表示
