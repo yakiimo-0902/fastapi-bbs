@@ -19,6 +19,12 @@
             </li>
         {% endfor %}
     </ul>
+    <!--ページネーションの共通化-->
+    {% set _page = page %}
+    {% set _total_pages = total_pages %}
+    {% set _base_url = "/threads/list" %}
+    {% include "common/pagination.html" %}
+
 </div>
 
 <!-- 最新投稿（スレッドの先頭10件） -->
@@ -33,8 +39,7 @@
             {{post.post_number}}:<strong>{{post.author}}</strong><br>
         {% endif%}
 
-            {{ post.content }}<br>
-            <small>日時：{{ post.created_at }}</small>
+            {{ post.content }}<small>日時：{{ post.created_at }}</small>
             {% if post.attachment %}
             <div class="attachment">
                 <img src="/static/uploads/{{ post.attachment }}"

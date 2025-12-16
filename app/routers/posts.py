@@ -199,3 +199,54 @@ async def create_new_post(
         url=f"/threads/{thread_id}/view",
         status_code=303
     )
+    
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import select, insert
+from faker import Faker   # ←フェイクデータ生成ライブラリ
+from app.models.post import Post
+from app.models.thread import Thread
+
+fake = Faker("ja_JP")
+
+# -----------------------
+# ダミー投稿作成
+# POST /threads/{thread_id}/gen_dummy_posts
+# -----------------------
+@threads_router.post("/{thread_id}/gen_dummy_posts")
+async def generate_dummy_posts(thread_id: int, count: int = 100, db: Session = Depends(get_db)):
+    # thread が存在するかチェック
+    stmt_thread = select(Thread).where(Thread.id == thread_id)
+    thread = db.execute(stmt_thread).scalar_one_or_none()
+    if thread is None:
+        # 見つからないので例外を raise 404 Not found
+        raise HTTPException(status_code=404, detail="Thread not found")
+
+    # 現在の最大 post_number を取得
+    stmt_last = (
+        select(Post.post_number)
+        .where(Post.thread_id == thread_id)
+        .order_by(Post.post_number.desc())
+        .limit(1)
+    )
+
+    last_number = db.execute(stmt_last).scalar_one_or_none()
+    current = 0 if last_number is None else last_number
+
+    # 複数件を一気に登録する
+    created = 0
+    for i in range(count):
+        current += 1
+
+        values = {
+            "thread_id": thread_id,
+            "post_number": current,
+            "content": fake.text(max_nb_chars=150), # fakerライブラリ使用
+            "author": fake.name(), # fakerライブラリ使用
+        }
+
+        db.execute(insert(Post).values(values))
+        created += 1
+
+    db.commit()
+    return {"status": "ok", "thread_id": thread_id, "created": created}

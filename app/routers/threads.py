@@ -5,7 +5,7 @@ from app.models.post import Post
 from app.schemas.thread import ThreadResponse, ThreadCreate
 from app.database import get_db
 from sqlalchemy.orm import Session
-from sqlalchemy import select, insert
+from sqlalchemy import select, insert,func
 
 router = APIRouter(
     prefix="/threads",
@@ -22,9 +22,33 @@ templates = Jinja2Templates(directory="app/templates")
 # フロント側処理 詳細
 # -----------------------------------
 @router.get("/{thread_id}/view", response_class=HTMLResponse)
-async def threads_detail_page(request: Request, thread_id: int, db: Session = Depends(get_db)):
+async def threads_detail_page(request: Request, thread_id: int,page:int=1 , db: Session = Depends(get_db)):
     ParentPost = aliased(Post)   # ← Post の別名（親投稿用）
-    # --- {thread_id}への投稿を取得（ThreadとJOIN） ---
+    limit = 10 # page当たりの件数
+    offset = (page - 1) * limit # 何件目から何件目を取得するか
+    
+# ───────────────
+    # ① 最初の投稿（post_number=1）を取得（固定表示）
+    # ───────────────
+    ParentPost = aliased(Post)
+    stmt_first = (
+        select(
+            Post.id,
+            Post.content,
+            Post.author,
+            Post.created_at,
+            Post.attachment,
+            Post.post_number,
+            ParentPost.post_number.label("parent_post_number")
+        )
+        .outerjoin(ParentPost, ParentPost.id == Post.parent_post_id)
+        .where(Post.thread_id == thread_id, Post.post_number == 1)
+    )
+    first_post = db.execute(stmt_first).first()
+
+    # ───────────────
+    # ② 2番目以降の投稿をページネーション
+    # ───────────────
     stmt_posts = (
         select(
             Post.id,
@@ -33,62 +57,38 @@ async def threads_detail_page(request: Request, thread_id: int, db: Session = De
             Post.created_at,
             Post.attachment,
             Post.post_number,
-            Thread.title.label("thread_title"),
-            Thread.id.label("thread_id"),
-            # 追加：親投稿の post_number（無い場合は NULL）
             ParentPost.post_number.label("parent_post_number")
         )
-        .join(Thread, Thread.id == Post.thread_id)
-        .where(Thread.id==thread_id)
-        .join(ParentPost, ParentPost.id == Post.parent_post_id, isouter=True)
+        .outerjoin(ParentPost, ParentPost.id == Post.parent_post_id)
+        .where(Post.thread_id == thread_id, Post.post_number > 1)
         .order_by(Post.post_number.asc())
+        .limit(limit)
+        .offset(offset)
     )
 
-    latest_posts = db.execute(stmt_posts).all()
+    posts = db.execute(stmt_posts).all()
+
+    # ───────────────
+    # ③ 全件数を取得して総ページ数を算出
+    # ───────────────
+    stmt_count = select(func.count()).where(
+        Post.thread_id == thread_id,
+        Post.post_number > 1
+    )
+    total_posts = db.execute(stmt_count).scalar_one()
+    total_pages = (total_posts + limit - 1) // limit
 
     return templates.TemplateResponse(
         "thread_detail.html",
-        {"request": request,
-        "latest_posts": latest_posts,
-        "thread_id":thread_id}
+        {
+            "request": request,
+            "first_post": first_post,
+            "posts": posts,
+            "thread_id": thread_id,
+            "page": page,
+            "total_pages": total_pages,
+        }
     )
-
-# -----------------------------------
-# フロント側処理 一覧
-# -----------------------------------
-@router.get("/list", response_class=HTMLResponse)
-async def list_threads_page(request: Request, db: Session = Depends(get_db)):
-
-    # スレッドの一覧を新しい順に取得
-    stmt = select(Thread).order_by(Thread.created_at.desc())
-    threads = db.execute(stmt).scalars().all()
-
-    # --- 最新投稿10件を取得（ThreadとJOIN） ---
-    stmt_posts = (
-        select(
-            Post.id,
-            Post.content,
-            Post.author,
-            Post.created_at,
-            Post.attachment,
-            Post.post_number,
-            Thread.title.label("thread_title"),
-            Thread.id.label("thread_id")
-        )
-        .join(Thread, Thread.id == Post.thread_id)
-        .order_by(Post.created_at.desc())
-        .limit(10)
-    )
-
-    latest_posts = db.execute(stmt_posts).all()
-
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request,
-        "threads": threads,
-        "latest_posts": latest_posts}
-    )
-
 
 
 # -----------------------------------
@@ -168,6 +168,71 @@ async def create_thread_front(
     )
 
 
+from sqlalchemy import select, insert,func
+# -----------------------------------
+# フロント側処理 一覧（ページネーション対応）
+# -----------------------------------
+@router.get("/list", response_class=HTMLResponse)
+async def list_threads_page(
+    request: Request, 
+    page: int = 1, 
+    db: Session = Depends(get_db)
+):
+
+    limit = 20  # 1ページあたりの件数
+    offset = (page - 1) * limit
+
+    # -----------------------------------
+    # ① スレッド一覧（ページネーション付き）
+    # -----------------------------------
+    stmt_threads = (
+        select(Thread)
+        .order_by(Thread.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    threads = db.execute(stmt_threads).scalars().all()
+
+    # -----------------------------------
+    # ② スレッド総数を取得 → ページ数算出
+    # -----------------------------------
+    stmt_count = select(func.count()).select_from(Thread)
+    total_threads = db.execute(stmt_count).scalar_one()
+    total_pages = (total_threads + limit - 1) // limit
+
+    # -----------------------------------
+    # ③ 最新投稿10件（これはそのまま）
+    # -----------------------------------
+    stmt_posts = (
+        select(
+            Post.id,
+            Post.content,
+            Post.author,
+            Post.created_at,
+            Post.attachment,
+            Post.post_number,
+            Thread.title.label("thread_title"),
+            Thread.id.label("thread_id"),
+        )
+        .join(Thread, Thread.id == Post.thread_id)
+        .order_by(Post.created_at.desc())
+        .limit(10)
+    )
+    latest_posts = db.execute(stmt_posts).all()
+
+    # -----------------------------------
+    # ④ テンプレートへ渡す
+    # -----------------------------------
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "threads": threads,
+            "latest_posts": latest_posts,
+            "page": page,
+            "total_pages": total_pages,
+        }
+    )
 
 # -----------------------------------
 # スレッド一覧 GET /threads
@@ -209,3 +274,50 @@ async def create_thread(thread: ThreadCreate,db: Session = Depends(get_db)):
     stmt2 = select(Thread).where(Thread.id == new_id)
     new_thread = db.execute(stmt2).scalar_one()
     return new_thread
+
+# -----------------------
+# ダミー投稿作成
+# POST /threads/gen_dummy_threads
+# -----------------------
+from faker import Faker
+fake = Faker("ja_JP")   # 日本語のデータを生成
+
+@router.post("/gen_dummy_threads")
+def generate_dummy_threads(
+    count: int = 100,               # ← デフォルト100件
+    db: Session = Depends(get_db)
+):
+    created_ids = []
+
+    for _ in range(count):
+        # ---------------------------------
+        # ① Thread 作成
+        # ---------------------------------
+        title = fake.sentence(nb_words=5)
+
+        stmt_thread = insert(Thread).values(title=title)
+        result = db.execute(stmt_thread)
+        thread_id = result.lastrowid
+
+        # ---------------------------------
+        # ② Post（最初の投稿 = post_number=1）
+        # ---------------------------------
+        content = fake.text(max_nb_chars=120)
+
+        stmt_post = insert(Post).values(
+            thread_id=thread_id,
+            content=content,
+            post_number=1,
+            author=fake.name(), # fakerライブラリ使用
+        )
+        db.execute(stmt_post)
+
+        created_ids.append(thread_id)
+
+    db.commit()
+
+    return {
+        "status":"ok",
+        "created_threads": len(created_ids),
+        "thread_ids": created_ids
+    }
