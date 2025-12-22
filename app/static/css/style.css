@@ -101,6 +101,9 @@ nav.menu a:hover {
     text-decoration: underline;
 }
 
+
+
+
 /* ===== ページネーション ===== */
 .pagination {
     margin: 20px 0;
@@ -132,4 +135,49 @@ nav.menu a:hover {
 .pagination .disabled {
     opacity: 0.4;
     cursor: default;
+}
+
+.post.highlight {
+    background-color: #fff7cc;
+    border-left: 4px solid #f59e0b;
+    padding: 8px;
+}
+
+#hit_title{
+    background-color: #fff7cc;
+    border-left: 4px solid #f59e0b;
+    padding: 8px;
+}
+
+#hit_post{
+    background-color: #fafe73;
+    border-left: 4px solid #f8ce12;
+    padding: 8px;
+}
+
+
+/* 検索結果表示部分 */
+.thread {
+    display: flex; /* 子要素を横並びにする */
+    align-items: center; /* (お好みで) 子要素を縦方向の中央に揃える */
+    border-bottom: 1px solid #ccc; /* 境界線など、スレッドの装飾 */
+    padding: 8px 0;
+}
+
+.title_area {
+/* 1. 要素の幅を固定する（Flexboxとの組み合わせのため必須） */
+    width: 300px;
+    /* 2. テキストが折り返さないようにする */
+    white-space: nowrap;
+    /* 3. 要素からはみ出たコンテンツを非表示にする */
+    overflow: hidden;
+    /* 4. はみ出して非表示にした部分を三点リーダーで示す */
+    text-overflow: ellipsis;
+}
+
+.hit_area {
+    /* ヒットエリアは、タイトルエリアの隣で余ったスペースを占めるか、
+       固定幅を保ちます。ここではシンプルにタイトルの隣に配置します。 */
+    flex-shrink: 0; /* 幅を固定幅（またはコンテンツ幅）から縮めないようにする */
+    margin-left: 10px; /* タイトルとの間に少し間隔を空ける */
 }

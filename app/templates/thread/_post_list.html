@@ -1,0 +1,42 @@
+{# --- 先頭投稿 --- #}
+{% if first_post %}
+<div class="first-post">
+    {{ first_post.post_number }}:<strong>{{ first_post.author }}</strong><br>
+    {{ first_post.content }}<br>
+    <small>{{ first_post.created_at }}</small>
+
+    {% if first_post.attachment %}
+    <div class="attachment">
+        <img src="/static/uploads/{{ first_post.attachment }}"
+             style="max-width: 300px; border: 1px solid #ccc;">
+    </div>
+    {% endif %}
+</div>
+<hr>
+{% endif %}
+
+{# --- 投稿一覧 --- #}
+{% for post in posts %}
+<div class="post {% if search_mode %}highlight{% endif %}">
+    {{ post.post_number }}:<strong>{{ post.author }}</strong><br>
+
+    {% if post.parent_post_number %}
+        >>{{ post.parent_post_number }}
+    {% endif %}
+
+    {{ post.content }}<br>
+    <small>日時：{{ post.created_at }}</small>
+
+    {% if post.attachment %}
+    <div class="attachment">
+        <img src="/static/uploads/{{ post.attachment }}"
+            style="max-width: 300px; border: 1px solid #ccc;">
+    </div>
+    {% endif %}
+
+    {% if not search_mode %}
+        <a onclick="repost_no({{ post.post_number }},{{ post.id }})">返信</a>
+    {% endif %}
+</div>
+<hr>
+{% endfor %}

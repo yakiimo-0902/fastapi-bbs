@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>検索結果</h2>
+<p>
+    検索ワード：
+    <strong>{{ keyword }}</strong>
+    <p>{{results | length}}件</p>
+</p>
+
+{% if results %}
+    <h3>スレッド一致</h3>
+    <div id="hit_title">
+    {% for thread, hit_title, hit_post in results %}
+
+        <div class="thread">
+            <div class="title_area"><a href="/threads/{{ thread.id }}/view/{{keyword}}">{{ thread.title }}</a></div>
+            <div class="hit_area">ヒット個所：
+            {% if hit_title %}タイトル{% endif %}
+            {% if hit_title and hit_post %}
+            　/　
+            {% endif %}
+            {% if hit_post %} 本文{% endif %}
+            </div>
+        </div>
+    {% endfor %}
+    </div>
+    {% set _page = page %}
+    {% set _total_pages = total_pages %}
+    {% set _base_url = "/threads/search?keyword=" ~ keyword ~"&"%}
+    {% include "common/pagination.html" %}
+
+{% else %}
+<div>一致するスレッド、投稿は見つかりませんでした</div>
+{% endif %}
+{% endblock %}

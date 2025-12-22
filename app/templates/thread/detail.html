@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% include "thread/_thread_header.html" %}
+
+{% include "thread/_post_list.html" %}
+
+{% if not search_mode %}
+    {% set _page = page %}
+    {% set _total_pages = total_pages %}
+    {% set _base_url = "/threads/" ~ thread.id ~ "/view?" %}
+    {% include "common/pagination.html" %}
+{% endif %}
+
+{% if not search_mode %}
+    {% include "thread/_post_form.html" %}
+{% endif %}
+
+{% endblock %}

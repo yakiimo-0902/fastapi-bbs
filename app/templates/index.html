@@ -19,10 +19,11 @@
             </li>
         {% endfor %}
     </ul>
+
     <!--ページネーションの共通化-->
     {% set _page = page %}
     {% set _total_pages = total_pages %}
-    {% set _base_url = "/threads/list" %}
+    {% set _base_url = "/threads/list?" %}
     {% include "common/pagination.html" %}
 
 </div>
@@ -33,17 +34,13 @@
 
     {% for post in latest_posts %}
         <div>
-        {%if post.thread_title %}
+        <a href="/threads/{{post.thread_id}}/view?post={{post.post_number}}">
             {{post.post_number}}:<strong>{{ post.thread_title }} - {{post.author}}</strong><br>
-        {% else %}
-            {{post.post_number}}:<strong>{{post.author}}</strong><br>
-        {% endif%}
-
+        </a>
             {{ post.content }}<small>日時：{{ post.created_at }}</small>
             {% if post.attachment %}
             <div class="attachment">
-                <img src="/static/uploads/{{ post.attachment }}"
-                        style="max-width: 300px; border: 1px solid #ccc;">
+                <img src="/static/uploads/{{ post.attachment }}" style="max-width: 300px; border: 1px solid #ccc;">
             </div>
             {% endif %}
             <hr>

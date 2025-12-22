@@ -2,8 +2,8 @@
 
     {# --- 先頭ページへ --- #}
     {% if _page > 1 %}
-        <a href="{{ _base_url }}?page=1">«</a>
-        <a href="{{ _base_url }}?page={{ _page - 1 }}">‹</a>
+        <a href="{{ _base_url }}page=1">«</a>
+        <a href="{{ _base_url }}page={{ _page - 1 }}">‹</a>
     {% else %}
         <span class="disabled">«</span>
         <span class="disabled">‹</span>
@@ -14,14 +14,14 @@
         {% if p == _page %}
             <span class="current-page">{{ p }}</span>
         {% else %}
-            <a href="{{ _base_url }}?page={{ p }}">{{ p }}</a>
+            <a href="{{ _base_url }}page={{ p }}">{{ p }}</a>
         {% endif %}
     {% endfor %}
 
     {# --- 次ページへ --- #}
     {% if _page < _total_pages %}
-        <a href="{{ _base_url }}?page={{ _page + 1 }}">›</a>
-        <a href="{{ _base_url }}?page={{ _total_pages }}">»</a>
+        <a href="{{ _base_url }}page={{ _page + 1 }}">›</a>
+        <a href="{{ _base_url }}page={{ _total_pages }}">»</a>
     {% else %}
         <span class="disabled">›</span>
         <span class="disabled">»</span>

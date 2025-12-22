@@ -1,0 +1,11 @@
+<h2>{{ thread.title }}</h2>
+
+{% if search_mode %}
+    <p>
+        検索ワード：
+        <strong>{{ keyword }}</strong>
+        <a href="/threads/{{ thread.id }}/view">（通常表示に戻る）</a>
+    </p>
+{% endif %}
+
+<hr>
