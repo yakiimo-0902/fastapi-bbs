@@ -1,17 +1,55 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import select, insert
+# =====================
+# Standard Library
+# =====================
+import os
 
-from app.schemas.post import PostCreate, PostResponse
+# =====================
+# Third Party
+# =====================
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    Form,
+    File,
+    UploadFile,
+)
+
+from fastapi.responses import (
+    HTMLResponse,
+    RedirectResponse,
+)
+
+from fastapi.templating import Jinja2Templates
+
+from sqlalchemy import (
+    select,
+    insert,
+)
+
+from sqlalchemy.orm import Session
+
+from faker import Faker
+fake = Faker("ja_JP")
+
+# =====================
+# Local Application
+# =====================
 from app.database import get_db
 from app.models.post import Post
 from app.models.thread import Thread
+from app.schemas.post import PostCreate, PostResponse
+from app.services.file_upload import save_image_file
+
 
 
 router = APIRouter(
     prefix="/posts",
     tags=["Posts"]
 )
+
+templates = Jinja2Templates(directory="app/templates")
 
 
 # -----------------------
@@ -33,7 +71,6 @@ async def get_post(post_id: int, db: Session = Depends(get_db)):
 # =======================
 # Threads に紐づくルート
 # =======================
-
 threads_router = APIRouter(
     prefix="/threads",
     tags=["Posts"]
@@ -107,20 +144,13 @@ async def create_post(thread_id: int, post: PostCreate, db: Session = Depends(ge
     return new_post
 
 
-from fastapi import Form, File, UploadFile, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse
-import os
-
-UPLOAD_DIR = "app/static/uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-templates = Jinja2Templates(directory="app/templates")
 # -----------------------
 # 投稿作成（通常 or 返信）
 # POST /threads/{thread_id}/posts
 # -----------------------
+UPLOAD_DIR = "app/static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 @threads_router.post("/{thread_id}/post", response_class=HTMLResponse)
 async def create_new_post(
     request: Request,
@@ -139,6 +169,20 @@ async def create_new_post(
         # 見つからないので例外を raise 404 Not found
         raise HTTPException(status_code=404, detail="Thread not found")
 
+    # 返信番号の存在チェック　存在しない番号に返信できないようにする
+    if parent_post_id_hidden is not None:
+        stmt_parent = select(Post).where(
+            Post.id == parent_post_id_hidden,
+            Post.thread_id == thread_id,
+        )
+        parent = db.execute(stmt_parent).scalar_one_or_none()
+
+        if parent is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Parent post does not exist"
+            )
+            
     # 次のpost_numberを取得
     stmt_last = (select(Post.post_number)
                 .where(Post.thread_id == thread_id)
@@ -153,15 +197,11 @@ async def create_new_post(
     # (1.5)添付ファイル処理
     attachment_filename = None
     if image and image.filename:
-        # ファイル名の決定
-        _,ext = os.path.splitext(image.filename)
-        filename = f"thread{thread_id}_post{next_number}{ext}"
-        save_path = os.path.join(UPLOAD_DIR,filename)
-
-        # 保存
-        with open(save_path,"wb") as f:
-            f.write(await image.read())
-        attachment_filename = filename
+        _, ext = os.path.splitext(image.filename)
+        attachment_filename = await save_image_file(
+            image=image,
+            filename=f"thread{thread_id}_post{next_number}{ext}"
+        )
 
 
     # 追加 INSERT
@@ -199,15 +239,6 @@ async def create_new_post(
         url=f"/threads/{thread_id}/view",
         status_code=303
     )
-    
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import select, insert
-from faker import Faker   # ←フェイクデータ生成ライブラリ
-from app.models.post import Post
-from app.models.thread import Thread
-
-fake = Faker("ja_JP")
 
 # -----------------------
 # ダミー投稿作成

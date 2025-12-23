@@ -2,15 +2,18 @@
 {% if first_post %}
 <div class="first-post">
     {{ first_post.post_number }}:<strong>{{ first_post.author }}</strong><br>
-    {{ first_post.content }}<br>
+    <pre>{{ first_post.content }}</pre><br>
     <small>{{ first_post.created_at }}</small>
 
     {% if first_post.attachment %}
     <div class="attachment">
-        <img src="/static/uploads/{{ first_post.attachment }}"
-             style="max-width: 300px; border: 1px solid #ccc;">
+        <img src="/static/uploads/{{ first_post.attachment }}" style="max-width: 300px; border: 1px solid #ccc;">
     </div>
     {% endif %}
+    {% if not search_mode %}
+        <p><a class="repost" onclick="repost_no(1,{{first_post.thread_id}})">返信</a></p>
+    {% endif %}
+
 </div>
 <hr>
 {% endif %}
@@ -24,18 +27,16 @@
         >>{{ post.parent_post_number }}
     {% endif %}
 
-    {{ post.content }}<br>
-    <small>日時：{{ post.created_at }}</small>
-
+    <pre>{{ post.content }}</pre><br>
+		<small>日時：{{ post.created_at }}</small>
     {% if post.attachment %}
     <div class="attachment">
-        <img src="/static/uploads/{{ post.attachment }}"
-            style="max-width: 300px; border: 1px solid #ccc;">
+        <img src="/static/uploads/{{ post.attachment }}" style="max-width: 300px; border: 1px solid #ccc;">
     </div>
     {% endif %}
 
     {% if not search_mode %}
-        <a onclick="repost_no({{ post.post_number }},{{ post.id }})">返信</a>
+        <p><a class="repost" onclick="repost_no({{ post.post_number }},{{ post.id }})">返信</a></p>
     {% endif %}
 </div>
 <hr>

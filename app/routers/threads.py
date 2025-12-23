@@ -1,25 +1,52 @@
-from fastapi import APIRouter,Depends, HTTPException, Request
+# =====================
+# Standard Library
+# =====================
+import os
+
+# =====================
+# Third Party
+# =====================
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    Form,
+    File,
+    UploadFile,
+)
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+from sqlalchemy import (
+    select,
+    insert,
+    func,
+    case,
+    distinct,
+    or_,
+)
+from sqlalchemy.orm import Session, aliased
+
+from faker import Faker
+fake = Faker("ja_JP")
+
+# =====================
+# Local Application
+# =====================
+from app.database import get_db
 from app.models.thread import Thread
 from app.models.post import Post
-
 from app.schemas.thread import ThreadResponse, ThreadCreate
-from app.database import get_db
-from sqlalchemy.orm import Session
-from sqlalchemy import select, insert,func
+from app.services.file_upload import save_image_file
 
 router = APIRouter(
     prefix="/threads",
     tags=["Threads"]
 )
 
-from fastapi import Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import aliased
-
 templates = Jinja2Templates(directory="app/templates")
 
-from sqlalchemy import select, insert,func,case,distinct,or_
 # -----------------------
 # 検索機能 GET /search
 # -----------------------
@@ -30,15 +57,19 @@ async def search_threads(
     page: int = 1,
     db: Session = Depends(get_db)
 ):
+
     limit = 20
+
     offset = (page - 1) * limit
     like_word = f"%{keyword}%"  #　検索キーワードを前後方一致で設定
 
+    # スレッドでの一致
     hit_title = case(
         (Thread.title.like(like_word), 1),
         else_=0
     ).label("hit_title")
 
+    # 投稿での一致
     hit_post = case(
         (
             select(1)
@@ -107,6 +138,7 @@ async def search_threads(
         }
     )
 
+
 # -----------------------------------
 # フロント側処理 詳細
 # -----------------------------------
@@ -115,9 +147,15 @@ async def threads_detail_page(
     request: Request,
     thread_id: int,
     page: int = 1,
+    post: int | None = None,
     db: Session = Depends(get_db),
 ):
     limit = 10
+
+    # 特定の投稿番号が含まれるページを表示する
+    if post is not None:
+        page = ((post - 1) // limit) + 1
+
     offset = (page - 1) * limit
 
     # ───────────────
@@ -203,6 +241,7 @@ async def threads_detail_page(
         }
     )
 
+
 # -----------------------------------
 # スレッド詳細（検索モード）
 # GET /threads/{thread_id}/view/{keyword}
@@ -276,6 +315,8 @@ async def thread_detail_search(
         }
     )
 
+
+
 # -----------------------------------
 # フロント側処理 スレッドの新規作成画面を表示
 # -----------------------------------
@@ -287,15 +328,6 @@ async def new_thread_page(request: Request):
 # -----------------------------------
 # フロント側処理 スレッドの新規作成
 # -----------------------------------
-from fastapi import Form, File, UploadFile, Request
-from fastapi.responses import RedirectResponse
-from sqlalchemy import insert, select
-from sqlalchemy.orm import Session
-from app.models.thread import Thread
-from app.models.post import Post
-from app.database import get_db
-import os
-
 UPLOAD_DIR = "app/static/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -314,18 +346,15 @@ async def create_thread_front(
     db.commit()
     new_thread_id = result.lastrowid
 
-    # (1.5)添付ファイル処理
+    # (1.5)添付ファイル処理　servicesに共通化した
     attachment_filename = None
-    if image and image.filename:
-        # ファイル名の決定
-        _,ext = os.path.splitext(image.filename)
-        filename = f"thread{new_thread_id}_post1{ext}"
-        save_path = os.path.join(UPLOAD_DIR,filename)
 
-        # 保存
-        with open(save_path,"wb") as f:
-            f.write(await image.read())
-        attachment_filename = filename
+    if image and image.filename:
+        _, ext = os.path.splitext(image.filename)
+        attachment_filename = await save_image_file(
+            image=image,
+            filename=f"thread{new_thread_id}_post1{ext}"
+        )
 
 
     # (2) Post（本文）作成
@@ -353,7 +382,7 @@ async def create_thread_front(
     )
 
 
-from sqlalchemy import select, insert,func
+
 # -----------------------------------
 # フロント側処理 一覧（ページネーション対応）
 # -----------------------------------
@@ -419,6 +448,7 @@ async def list_threads_page(
         }
     )
 
+
 # -----------------------------------
 # スレッド一覧 GET /threads
 # -----------------------------------
@@ -464,9 +494,6 @@ async def create_thread(thread: ThreadCreate,db: Session = Depends(get_db)):
 # ダミー投稿作成
 # POST /threads/gen_dummy_threads
 # -----------------------
-from faker import Faker
-fake = Faker("ja_JP")   # 日本語のデータを生成
-
 @router.post("/gen_dummy_threads")
 def generate_dummy_threads(
     count: int = 100,               # ← デフォルト100件
@@ -506,4 +533,3 @@ def generate_dummy_threads(
         "created_threads": len(created_ids),
         "thread_ids": created_ids
     }
-

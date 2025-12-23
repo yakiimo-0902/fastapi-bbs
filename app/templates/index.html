@@ -34,10 +34,15 @@
 
     {% for post in latest_posts %}
         <div>
+        {% if post.parent_post_number %}
+            >>{{ post.parent_post_number }}
+        {% endif %}
+
         <a href="/threads/{{post.thread_id}}/view?post={{post.post_number}}">
             {{post.post_number}}:<strong>{{ post.thread_title }} - {{post.author}}</strong><br>
         </a>
-            {{ post.content }}<small>日時：{{ post.created_at }}</small>
+        <pre>{{ post.content }}</pre><br>
+        <small>日時：{{ post.created_at }}</small>
             {% if post.attachment %}
             <div class="attachment">
                 <img src="/static/uploads/{{ post.attachment }}" style="max-width: 300px; border: 1px solid #ccc;">
